@@ -5,13 +5,19 @@ fn main() {
 
     let elves = input.split("\n\n");
 
-    let sums = elves.map(|elf| {
-        elf.split('\n')
-            .filter(|line| !line.is_empty())
-            .map(|line| line.parse::<u32>().unwrap())
-            .sum::<u32>()
-    });
+    let mut sums: Vec<u32> = elves
+        .map(|elf| {
+            elf.split('\n')
+                .filter(|line| !line.is_empty())
+                .map(|line| line.parse::<u32>().unwrap())
+                .sum()
+        })
+        .collect();
+    sums.sort_unstable();
 
-    let largest_sum = sums.max().unwrap();
-    println!("Result: {largest_sum}");
+    let best_elf = sums.iter().rev().take(1).sum::<u32>();
+    println!("Best: {best_elf}");
+
+    let three_best_elves = sums.iter().rev().take(3).sum::<u32>();
+    println!("Sum of three best: {three_best_elves}");
 }
