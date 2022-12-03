@@ -3,23 +3,30 @@ use std::{
     fs::read_to_string,
 };
 
-fn shared_items(backpack: &str) -> Vec<char> {
+fn shared_items_backpack(backpack: &str) -> Vec<char> {
     let pieces = backpack.split_at(backpack.len() / 2);
     let compartment1: HashSet<_, RandomState> = HashSet::from_iter(pieces.0.chars());
     let compartment2 = HashSet::from_iter(pieces.1.chars());
 
-    let output = compartment1.intersection(&compartment2).cloned().collect();
-    println!("{:?} {:?} -> {:?}", compartment1, compartment2, output);
-    output
+    compartment1.intersection(&compartment2).cloned().collect()
+}
+
+fn shared_item_elves(elves: &[&str]) -> char {
+    let shared = elves
+        .iter()
+        .map(|backpack| HashSet::from_iter(backpack.chars()))
+        .reduce(|a: HashSet<_, RandomState>, b| a.intersection(&b).cloned().collect())
+        .expect("No elves? o.O");
+
+    *shared.iter().next().expect("there was no shared item")
 }
 
 fn score(item: char) -> u32 {
     let ordinal = item as u32;
-    println!("{item}: {ordinal}");
     match item {
         'a'..='z' => ordinal - 'a' as u32 + 1,
         'A'..='Z' => ordinal - 'A' as u32 + 27,
-        _ => panic!(),
+        _ => panic!("Invalid character"),
     }
 }
 
@@ -28,10 +35,17 @@ fn main() {
 
     let backpacks = input.lines();
     let scores = backpacks
-        .map(shared_items)
+        .clone()
+        .map(shared_items_backpack)
         .flat_map(|shared| shared.into_iter().map(score));
 
     println!("Part 1: {}", scores.sum::<u32>());
+
+    let backpacks: Vec<_> = backpacks.collect();
+    let groups = backpacks.chunks(3);
+    let scores = groups.map(shared_item_elves).map(score);
+
+    println!("Part 2: {}", scores.sum::<u32>());
 }
 
 #[cfg(test)]
