@@ -1,6 +1,4 @@
-use std::{fs::read_to_string, str::FromStr};
-
-use itertools::Itertools;
+use std::fs::read_to_string;
 
 fn parse_stacks<'a>(input: impl Iterator<Item = &'a str>) -> Vec<Vec<char>> {
     let lines: Vec<&str> = input.collect();
@@ -51,16 +49,25 @@ fn parse_commands<'a>(input: impl Iterator<Item = &'a str>) -> Vec<Command> {
         .collect()
 }
 
-fn task_1(mut stacks: Vec<Vec<char>>, commands: Vec<Command>) -> String {
+fn task_1(mut stacks: Vec<Vec<char>>, commands: &Vec<Command>) -> String {
     for command in commands {
         for _ in 0..command.count {
             let item = stacks[command.source - 1].pop().unwrap();
             stacks[command.destination - 1].push(item);
         }
     }
-    stacks
-        .iter()
-        .for_each(|stack| println!("{}", String::from_iter(stack.iter())));
+
+    String::from_iter(stacks.iter().map(|stack| stack.last().unwrap()))
+}
+
+fn task_2(mut stacks: Vec<Vec<char>>, commands: &Vec<Command>) -> String {
+    for command in commands {
+        let mut items = Vec::new();
+        for _ in 0..command.count {
+            items.push(stacks[command.source - 1].pop().unwrap());
+        }
+        stacks[command.destination - 1].extend(items.iter().rev());
+    }
 
     String::from_iter(stacks.iter().map(|stack| stack.last().unwrap()))
 }
@@ -72,13 +79,11 @@ fn main() {
 
     let stacks = parse_stacks(lines.by_ref().take_while(|line| !line.is_empty()));
 
-    stacks
-        .iter()
-        .for_each(|stack| println!("{}", String::from_iter(stack.iter())));
-    println!();
     let commands = parse_commands(lines.by_ref());
 
-    let solution = task_1(stacks, commands);
-    println!();
-    println!("Task 1: {solution}")
+    let solution = task_1(stacks.clone(), &commands);
+    println!("Task 1: {solution}");
+
+    let solution = task_2(stacks, &commands);
+    println!("Task 2: {solution}")
 }
