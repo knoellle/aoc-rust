@@ -28,23 +28,25 @@ struct Command {
     destination: usize,
 }
 
-fn parse_commands<'a>(input: impl Iterator<Item = &'a str>) -> Vec<Command> {
+fn get_next_number<'a>(iterator: &mut impl Iterator<Item = &'a str>) -> Option<usize> {
+    iterator.next();
+    iterator.next()?.parse().ok()
+}
+
+fn parse_commands<'a>(input: impl Iterator<Item = &'a str>) -> Option<Vec<Command>> {
     input
         .map(|line| {
             let mut words = line.split(' ');
 
-            words.next();
-            let count = words.next().unwrap().parse().unwrap();
-            words.next();
-            let source = words.next().unwrap().parse().unwrap();
-            words.next();
-            let destination = words.next().unwrap().parse().unwrap();
+            let count = get_next_number(&mut words)?;
+            let source = get_next_number(&mut words)?;
+            let destination = get_next_number(&mut words)?;
 
-            Command {
+            Some(Command {
                 count,
                 source,
                 destination,
-            }
+            })
         })
         .collect()
 }
@@ -78,8 +80,7 @@ fn main() {
     let mut lines = input.lines();
 
     let stacks = parse_stacks(lines.by_ref().take_while(|line| !line.is_empty()));
-
-    let commands = parse_commands(lines.by_ref());
+    let commands = parse_commands(lines.by_ref()).unwrap();
 
     let solution = task_1(stacks.clone(), &commands);
     println!("Task 1: {solution}");
