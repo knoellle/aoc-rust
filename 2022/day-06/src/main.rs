@@ -1,36 +1,47 @@
-use std::fs::read_to_string;
+use std::{collections::HashSet, fs::read_to_string};
 
-fn start_of_packet(data: &str) -> usize {
+fn start_of_packet(data: &str, window_size: usize) -> usize {
     let chars: Vec<_> = data.chars().collect();
     chars
-        .windows(4)
+        .windows(window_size)
         .enumerate()
-        .find(|(_index, window)| {
-            !window[1..4].contains(&window[0])
-                && !window[0..3].contains(&window[3])
-                && window[1] != window[2]
-        })
+        .find(|(_index, window)| HashSet::<_>::from_iter(window.iter()).len() == window_size)
         .map(|(index, _window)| index)
         .unwrap()
-        + 4
+        + window_size
 }
 
 fn main() {
     let input = read_to_string("input").unwrap();
 
-    let start = start_of_packet(&input);
-    println!("Start of packet: {start}");
+    let start = start_of_packet(&input, 4);
+    println!("Start of packet part 1: {start}");
+
+    let start = start_of_packet(&input, 14);
+    println!("Start of packet part 2: {start}");
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+
     #[test]
-    fn examples() {
-        assert_eq!(start_of_packet("mjqjpqmgbljsphdztnvjfqwrcgsmlb"), 7);
-        assert_eq!(start_of_packet("bvwbjplbgvbhsrlpgdmjqwftvncz"), 5);
-        assert_eq!(start_of_packet("nppdvjthqldpwncqszvftbrmjlhg"), 6);
-        assert_eq!(start_of_packet("nznrnfrfntjfmvfwmzdfjlvtqnbhcprsg"), 10);
-        assert_eq!(start_of_packet("zcfzfwzzqfrljwzlrfnpqdbhtmscgvjw"), 11);
+    fn examples_part_1() {
+        let ws = 4;
+        assert_eq!(start_of_packet("mjqjpqmgbljsphdztnvjfqwrcgsmlb", ws), 7);
+        assert_eq!(start_of_packet("bvwbjplbgvbhsrlpgdmjqwftvncz", ws), 5);
+        assert_eq!(start_of_packet("nppdvjthqldpwncqszvftbrmjlhg", ws), 6);
+        assert_eq!(start_of_packet("nznrnfrfntjfmvfwmzdfjlvtqnbhcprsg", ws), 10);
+        assert_eq!(start_of_packet("zcfzfwzzqfrljwzlrfnpqdbhtmscgvjw", ws), 11);
+    }
+
+    #[test]
+    fn examples_part_2() {
+        let ws = 14;
+        assert_eq!(start_of_packet("mjqjpqmgbljsphdztnvjfqwrcgsmlb", ws), 19);
+        assert_eq!(start_of_packet("bvwbjplbgvbhsrlpgdmjqwftvncz", ws), 23);
+        assert_eq!(start_of_packet("nppdvjthqldpwncqszvftbrmjlhg", ws), 23);
+        assert_eq!(start_of_packet("nznrnfrfntjfmvfwmzdfjlvtqnbhcprsg", ws), 29);
+        assert_eq!(start_of_packet("zcfzfwzzqfrljwzlrfnpqdbhtmscgvjw", ws), 26);
     }
 }
