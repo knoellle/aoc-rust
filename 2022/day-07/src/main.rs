@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs::read_to_string};
+use std::{collections::HashMap, fs::read_to_string, iter::once};
 
 #[derive(Debug)]
 enum Item {
@@ -21,18 +21,6 @@ impl Item {
             Item::File(file) => file.size,
         }
     }
-
-    // fn at(&self, path: &[String]) -> Option<&Self> {
-    //     let mut current = self;
-    //     for element in path {
-    //         current = match current {
-    //             Item::Directory(directory) => directory.children.get(element)?,
-    //             Item::File(_) => return None,
-    //         }
-    //     }
-    //
-    //     Some(current)
-    // }
 
     fn at_mut(&mut self, path: &[String]) -> Option<&mut Self> {
         let mut current = self;
@@ -142,11 +130,32 @@ fn task_1(tree: &Item) -> u32 {
     }
 }
 
+fn task_2(tree: &Item, minimum_size: u32) -> Option<u32> {
+    match tree {
+        Item::Directory(directory) => directory
+            .children
+            .iter()
+            .filter_map(|(_name, item)| task_2(item, minimum_size))
+            .chain(once(tree.size()))
+            .filter(|size| *size > minimum_size)
+            .min(),
+        Item::File(_) => None,
+    }
+}
+
 fn main() {
     let input = read_to_string("input").unwrap();
     let tree = generate_tree(&input);
     println!("{:#?}", tree);
     println!("Task 1: {}", task_1(&tree));
+    let total_space = 70000000;
+    let used_space = tree.size();
+    let free_space = total_space - used_space;
+    let required_additional_space = 30000000 - free_space;
+    println!(
+        "Task 2: {}",
+        task_2(&tree, required_additional_space).expect("no suitable directory to delete found")
+    );
 }
 
 #[cfg(test)]
@@ -154,9 +163,18 @@ mod test {
     use super::*;
 
     #[test]
-    fn example() {
+    fn example_task_1() {
         let input = read_to_string("example").unwrap();
         let tree = generate_tree(&input);
-        assert_eq!(task_1(&tree), 95437);
+
+        assert_eq!(tree.size(), 48381165);
+    }
+
+    #[test]
+    fn example_used_space() {
+        let input = read_to_string("example").unwrap();
+        let tree = generate_tree(&input);
+
+        assert_eq!(tree.size(), 48381165);
     }
 }
