@@ -33,6 +33,15 @@ impl Item {
 
         Some(current)
     }
+
+    fn insert_at(&mut self, path: &[String], name: String, item: Item) {
+        let directory = match self.at_mut(path) {
+            Some(Item::Directory(directory)) => directory,
+            Some(Item::File(_)) => panic!("Tried to cd into a file"),
+            None => panic!("requested directory does not exist!"),
+        };
+        directory.children.entry(name).or_insert(item);
+    }
 }
 
 #[derive(Debug, Default)]
@@ -63,46 +72,25 @@ fn generate_tree(input: &str) -> Item {
         let mut words = line.split_whitespace();
         match (words.next().unwrap(), words.next().unwrap(), words.next()) {
             ("$", "cd", Some("/")) => {
-                current_path = Vec::new();
+                current_path.clear();
             }
             ("$", "cd", Some("..")) => {
                 current_path.pop();
             }
             ("$", "cd", Some(name)) => {
-                let current_directory = match root.at_mut(&current_path) {
-                    Some(Item::Directory(directory)) => directory,
-                    Some(Item::File(_)) => panic!("Tried to cd into a file"),
-                    None => panic!("current directory does not exist!"),
-                };
-                current_directory
-                    .children
-                    .entry(name.to_string())
-                    .or_insert_with(Item::directory);
+                root.insert_at(&current_path, name.to_string(), Item::directory());
                 current_path.push(name.to_string());
             }
             ("$", "ls", None) => {}
             ("dir", name, None) => {
-                let current_directory = match root.at_mut(&current_path) {
-                    Some(Item::Directory(directory)) => directory,
-                    Some(Item::File(_)) => panic!("Tried to cd into a file"),
-                    None => panic!("current directory does not exist!"),
-                };
-                current_directory
-                    .children
-                    .entry(name.to_string())
-                    .or_insert_with(Item::directory);
+                root.insert_at(&current_path, name.to_string(), Item::directory());
             }
             (size, name, None) => {
-                let current_directory = match root.at_mut(&current_path) {
-                    Some(Item::Directory(directory)) => directory,
-                    Some(Item::File(_)) => panic!("Tried to cd into a file"),
-                    None => panic!("current directory does not exist!"),
-                };
-                let size = size.parse().expect("file size not an integer: {size}");
-                current_directory
-                    .children
-                    .entry(name.to_string())
-                    .or_insert_with(|| Item::file(size));
+                root.insert_at(
+                    &current_path,
+                    name.to_string(),
+                    Item::file(size.parse().expect("file size not an integer: {size}")),
+                );
             }
             words => panic!("Unknown command: {words:?}"),
         }
