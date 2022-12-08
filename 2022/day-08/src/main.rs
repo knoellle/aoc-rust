@@ -1,6 +1,6 @@
 use std::fs::read_to_string;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum Direction {
     Up,
     Down,
@@ -45,12 +45,16 @@ impl Map {
         self.map.get(y as usize)?.get(x as usize).copied()
     }
 
-    fn visible(&self, x: isize, y: isize) -> Option<bool> {
-        let height = self.at(x, y)?;
+    fn visible(&self, x: usize, y: usize) -> Option<bool> {
+        let height = self.at(x as isize, y as isize)?;
         Some(Direction::all().iter().any(|direction| {
             (1..)
-                .map_while(|step| self.at(x + direction.x(step), y + direction.y(step)))
-                .fuse()
+                .map_while(|step| {
+                    self.at(
+                        x as isize + direction.x(step),
+                        y as isize + direction.y(step),
+                    )
+                })
                 .max()
                 .map(|max| max < height)
                 .unwrap_or(true)
@@ -69,10 +73,45 @@ impl Map {
         (0..self.map.len())
             .map(|y| {
                 (0..self.map[y].len())
-                    .filter(|x| self.visible(*x as isize, y as isize).unwrap())
+                    .filter(|x| self.visible(*x, y).unwrap())
                     .count()
             })
             .sum()
+    }
+
+    fn scenic_score(&self, x: usize, y: usize) -> Option<usize> {
+        let height = self.at(x as isize, y as isize)?;
+        Some(
+            Direction::all()
+                .iter()
+                .map(|direction| {
+                    let iter = (1..).map_while(|step| {
+                        self.at(
+                            x as isize + direction.x(step),
+                            y as isize + direction.y(step),
+                        )
+                    });
+                    let max = iter.clone().max().unwrap_or(0);
+                    let count = iter.take_while(|x| *x < height).count();
+
+                    if max >= height {
+                        count + 1
+                    } else {
+                        count
+                    }
+                })
+                .product(),
+        )
+    }
+
+    fn best_scenic_score(&self) -> Option<usize> {
+        (0..self.map.len())
+            .flat_map(|y| {
+                (0..self.map[y].len())
+                    .map(|x| self.scenic_score(x, y).unwrap())
+                    .max()
+            })
+            .max()
     }
 }
 
@@ -99,6 +138,10 @@ fn main() {
 
     let map = Map::from(input.as_str());
     println!("Visible trees: {}", map.count_visible());
+    println!(
+        "Best scenic score: {}",
+        map.best_scenic_score().expect("map empty?")
+    );
 }
 
 #[cfg(test)]
@@ -128,6 +171,9 @@ mod test {
         assert_eq!(map.visible(2, 3), Some(true));
         assert_eq!(map.visible(3, 3), Some(false));
 
-        assert_eq!(map.count_visible(), 21)
+        assert_eq!(map.count_visible(), 21);
+
+        assert_eq!(map.scenic_score(2, 1), Some(4));
+        assert_eq!(map.scenic_score(2, 3), Some(8));
     }
 }
