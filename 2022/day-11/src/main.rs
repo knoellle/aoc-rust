@@ -2,14 +2,14 @@ use std::fs::read_to_string;
 
 #[derive(Debug, Clone, Copy)]
 enum Operation {
-    Add(u32),
-    Multiply(u32),
+    Add(u64),
+    Multiply(u64),
     Square,
     Double,
 }
 
 impl Operation {
-    fn apply(&self, old: u32) -> u32 {
+    fn apply(&self, old: u64) -> u64 {
         match self {
             Operation::Add(value) => old + value,
             Operation::Multiply(value) => old * value,
@@ -35,14 +35,14 @@ impl From<&str> for Operation {
 
 #[derive(Debug)]
 struct Monkey {
-    items: Vec<u32>,
+    items: Vec<u64>,
     operation: Operation,
-    test_divisor: u32,
+    test_divisor: u64,
     test_targets_true: usize,
     test_targets_false: usize,
 }
 
-fn parse_csv_numbers(inputs: &str) -> Vec<u32> {
+fn parse_csv_numbers(inputs: &str) -> Vec<u64> {
     inputs.split(", ").map(|num| num.parse().unwrap()).collect()
 }
 
@@ -51,10 +51,10 @@ fn get_next_after<'a>(mut lines: impl Iterator<Item = &'a str>, delimiter: &'a s
 }
 
 impl Monkey {
-    fn inspect(&self, item: u32) -> u32 {
-        self.operation.apply(item) / 3
+    fn inspect(&self, item: u64) -> u64 {
+        self.operation.apply(item)
     }
-    fn throw(&self, item: u32) -> usize {
+    fn throw(&self, item: u64) -> usize {
         if item % self.test_divisor == 0 {
             self.test_targets_true
         } else {
@@ -90,16 +90,16 @@ where
     }
 }
 
-fn play_round(monkeys: &mut [Monkey]) -> Vec<usize> {
+fn play_round(monkeys: &mut [Monkey], worry_divisor: u64) -> Vec<usize> {
     let mut business: Vec<usize> = Vec::new();
     business.resize(monkeys.len(), 0);
 
     for index in 0..monkeys.len() {
-        let items: Vec<u32> = monkeys[index].items.drain(..).collect();
+        let items: Vec<u64> = monkeys[index].items.drain(..).collect();
         business[index] += items.len();
 
         for item in items {
-            let new_item = monkeys[index].inspect(item);
+            let new_item = monkeys[index].inspect(item) / worry_divisor;
             let new_index = monkeys[index].throw(new_item);
             monkeys[new_index].items.push(new_item);
         }
@@ -113,11 +113,45 @@ fn task_1(monkeys: &mut [Monkey]) -> usize {
     business.resize(monkeys.len(), 0);
 
     for _round in 0..20 {
-        let new_busines = play_round(monkeys);
+        let new_busines = play_round(monkeys, 3);
         business
             .iter_mut()
             .zip(new_busines)
             .for_each(|(old, additional)| *old += additional)
+    }
+
+    business.sort();
+    business.reverse();
+    business[0] * business[1]
+}
+
+fn task_2(monkeys: &mut [Monkey]) -> usize {
+    let mut business: Vec<usize> = Vec::new();
+    business.resize(monkeys.len(), 0);
+
+    let divisor: u64 = monkeys.iter().map(|monkey| monkey.test_divisor).product();
+
+    for round in 0..10_000 {
+        let new_busines = play_round(monkeys, 1);
+        business
+            .iter_mut()
+            .zip(new_busines)
+            .for_each(|(old, additional)| *old += additional);
+        if [
+            1, 20, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000,
+        ]
+        .contains(&(round + 1))
+        {
+            println!("{} Business: {:?}", round + 1, business);
+        }
+
+        for monkey in monkeys.iter_mut() {
+            for item in monkey.items.iter_mut() {
+                *item %= divisor;
+                print!("{item} ");
+            }
+            println!();
+        }
     }
 
     business.sort();
@@ -132,7 +166,14 @@ fn main() {
         .map(|monkey| Monkey::from(monkey.lines().skip(1)))
         .collect();
     let business = task_1(&mut monkeys);
-    println!("Business score: {business}");
+    println!("Task 1: {business}");
+
+    let mut monkeys: Vec<Monkey> = input
+        .split("\n\n")
+        .map(|monkey| Monkey::from(monkey.lines().skip(1)))
+        .collect();
+    let business = task_2(&mut monkeys);
+    println!("Task 2: {business}");
 }
 
 #[cfg(test)]
@@ -140,7 +181,7 @@ mod test {
     use super::*;
 
     #[test]
-    fn example() {
+    fn example_1() {
         let input = read_to_string("example").unwrap();
         let mut monkeys: Vec<Monkey> = input
             .split("\n\n")
@@ -148,5 +189,16 @@ mod test {
             .collect();
         let business = task_1(&mut monkeys);
         assert_eq!(business, 10605);
+    }
+
+    #[test]
+    fn example_2() {
+        let input = read_to_string("example").unwrap();
+        let mut monkeys: Vec<Monkey> = input
+            .split("\n\n")
+            .map(|monkey| Monkey::from(monkey.lines().skip(1)))
+            .collect();
+        let business = task_2(&mut monkeys);
+        assert_eq!(business, 2713310158);
     }
 }
