@@ -54,12 +54,34 @@ fn task_1(values: &[i32]) -> i32 {
     values.iter().sum()
 }
 
+fn task_2(values: &[i32]) -> Vec<String> {
+    values[1..] // skip dummy value
+        .chunks(40)
+        .map(|line| {
+            line.iter()
+                .enumerate()
+                .map(|(index, value)| {
+                    if (index as i32 - value).abs() < 2 {
+                        '#'
+                    } else {
+                        '.'
+                    }
+                })
+                .collect()
+        })
+        .collect()
+}
+
 fn main() {
     let input = read_to_string("input").unwrap();
     let instructions = input.lines().map(|line| line.into());
     let outputs = run(instructions);
     let signal_strengths = signal_strengths(&outputs);
     println!("Task 1: {}", task_1(&signal_strengths));
+    let lines = task_2(&outputs);
+    for line in lines {
+        println!("{line}");
+    }
 }
 
 #[cfg(test)]
@@ -89,5 +111,20 @@ mod test {
         assert_eq!(signal_strengths[220], 3960);
 
         assert_eq!(task_1(&signal_strengths), 13140);
+    }
+
+    #[test]
+    fn example_task2() {
+        let input = read_to_string("example").unwrap();
+        let instructions = input.lines().map(|line| line.into());
+        let outputs = run(instructions);
+        let lines = task_2(&outputs);
+
+        assert_eq!(lines[0], "##..##..##..##..##..##..##..##..##..##..");
+        assert_eq!(lines[1], "###...###...###...###...###...###...###.");
+        assert_eq!(lines[2], "####....####....####....####....####....");
+        assert_eq!(lines[3], "#####.....#####.....#####.....#####.....");
+        assert_eq!(lines[4], "######......######......######......####");
+        assert_eq!(lines[5], "#######.......#######.......#######.....");
     }
 }
