@@ -131,26 +131,17 @@ fn task_2(monkeys: &mut [Monkey]) -> usize {
 
     let divisor: u64 = monkeys.iter().map(|monkey| monkey.test_divisor).product();
 
-    for round in 0..10_000 {
+    for _round in 0..10_000 {
         let new_busines = play_round(monkeys, 1);
         business
             .iter_mut()
             .zip(new_busines)
             .for_each(|(old, additional)| *old += additional);
-        if [
-            1, 20, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000,
-        ]
-        .contains(&(round + 1))
-        {
-            println!("{} Business: {:?}", round + 1, business);
-        }
 
         for monkey in monkeys.iter_mut() {
             for item in monkey.items.iter_mut() {
                 *item %= divisor;
-                print!("{item} ");
             }
-            println!();
         }
     }
 
