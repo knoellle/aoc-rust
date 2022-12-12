@@ -171,6 +171,15 @@ impl Map {
             .0;
         self.cells[start].cost
     }
+
+    fn lowest_starting_cost(&self) -> usize {
+        self.cells
+            .iter()
+            .filter(|cell| cell.elevation() == 0)
+            .min_by_key(|cell| cell.cost)
+            .unwrap()
+            .cost
+    }
 }
 
 fn main() {
@@ -180,6 +189,7 @@ fn main() {
     map.solve();
     println!("{map}");
     println!("Steps to end: {}", map.count_steps_to_end());
+    println!("Cheapest start: {}", map.lowest_starting_cost());
 }
 
 #[cfg(test)]
