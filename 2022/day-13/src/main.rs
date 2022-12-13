@@ -1,7 +1,7 @@
 use std::{cmp::Ordering, fmt::Write, iter::Peekable};
 use std::{fmt::Display, fs::read_to_string};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 enum Item {
     Value(u32),
     List(Vec<Item>),
@@ -107,6 +107,12 @@ impl PartialOrd for Item {
     }
 }
 
+impl Ord for Item {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap()
+    }
+}
+
 fn main() {
     let input = read_to_string("input").unwrap();
     let pairs: Vec<Vec<_>> = input
@@ -122,6 +128,30 @@ fn main() {
     });
     let sum: usize = right_order_indices.sum();
     println!("Sum of correctly ordered pair indices: {sum}");
+
+    let received_packets = input
+        .lines()
+        .filter(|line| !line.is_empty())
+        .map(|line| Item::parse(&mut line.chars().peekable()).unwrap());
+    let dividers = vec![
+        Item::List(vec![Item::List(vec![Item::Value(2)])]),
+        Item::List(vec![Item::List(vec![Item::Value(6)])]),
+    ];
+    let mut all_packets = dividers.clone();
+    all_packets.extend(received_packets);
+    all_packets.sort();
+
+    let divider_indices = dividers
+        .iter()
+        .map(|divider| {
+            all_packets
+                .iter()
+                .enumerate()
+                .find(|(_index, packet)| divider == *packet)
+                .unwrap()
+        })
+        .map(|(index, _packet)| index + 1);
+    println!("Decoder key: {}", divider_indices.product::<usize>());
 }
 
 #[cfg(test)]
