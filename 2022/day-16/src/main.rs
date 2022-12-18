@@ -4,6 +4,7 @@ use std::{
     fmt::{Display, Write},
     fs::read_to_string,
     sync::{Arc, Mutex},
+    vec,
 };
 
 use eyre::Result;
@@ -63,8 +64,21 @@ impl std::fmt::Debug for Graph {
 
 #[derive(Debug, PartialEq, Eq)]
 enum Step {
-    Move(Position),
+    Move(Position, usize),
     Open,
+}
+
+#[derive(Debug, Clone)]
+struct Actor {
+    position: Position,
+    time_remaining: u32,
+}
+
+#[derive(Debug, Clone)]
+struct RecursionState {
+    time_remaining: u32,
+    actors: Vec<Actor>,
+    closed_valves: HashSet<Position>,
 }
 
 impl Graph {
@@ -142,7 +156,7 @@ impl Graph {
             .iter()
             .enumerate()
             .map(|(index, step)| match step {
-                Step::Move(new_position) => {
+                Step::Move(new_position, _) => {
                     if !self.nodes[&position].exits.contains_key(new_position) {
                         panic!("{new_position} not reachable from {position}. Route: {route:?}");
                     }
@@ -227,7 +241,7 @@ impl Graph {
                     &mut already_opened,
                 )
                 .unwrap_or_default();
-            Some((pressure, Step::Move(*exit.0), steps))
+            Some((pressure, Step::Move(*exit.0, 0), steps))
         });
 
         let (pressure, step, mut steps) = open_step
@@ -249,6 +263,109 @@ impl Graph {
             &mut HashSet::from_iter(Some(position)),
         )
     }
+
+    fn find_best_path_2_recurse(
+        &self,
+        mut state: RecursionState,
+        score_so_far: u32,
+        best_score: Arc<Mutex<u32>>,
+    ) -> Option<(u32, Vec<Step>)> {
+        // println!("{state:?}");
+        // println!("{score_so_far:?}");
+        if state.time_remaining == 0 || state.closed_valves.is_empty() {
+            return None;
+        }
+        let best_possible_score: u32 = state
+            .closed_valves
+            .iter()
+            .map(|position| self.nodes[position].rate * (state.time_remaining - 1))
+            .sum();
+        {
+            if *best_score.lock().unwrap() > score_so_far + best_possible_score {
+                return None;
+            }
+        }
+        let (actor_index, time_advance) = state
+            .actors
+            .iter()
+            .map(|actor| actor.time_remaining)
+            .enumerate()
+            .min_by_key(|(_index, time_remaining)| *time_remaining)
+            .unwrap();
+        state
+            .actors
+            .iter_mut()
+            .for_each(|actor| actor.time_remaining -= time_advance);
+        let actor_position = state.actors[actor_index].position;
+        let exits = state
+            .closed_valves
+            .par_iter()
+            .filter(|position| **position != actor_position)
+            .map(|position| (position, self.nodes[&actor_position].exits[position]));
+        state.time_remaining -= time_advance;
+
+        let steps = exits.filter_map(|(exit, cost)| {
+            if state.time_remaining < cost + 1 {
+                return None;
+            }
+            let mut new_state = state.clone();
+            new_state.closed_valves.remove(exit);
+            new_state.actors[actor_index].position = *exit;
+            new_state.actors[actor_index].time_remaining = cost + 1;
+
+            let additional_release = (state.time_remaining - (cost + 1)) * self.nodes[exit].rate;
+            // println!("{exit} {additional_release}");
+            let pressure = score_so_far + additional_release;
+            {
+                let mut best_score = best_score.lock().unwrap();
+                // println!("{best_score} < {pressure}");
+                if *best_score < pressure {
+                    **best_score.borrow_mut() = pressure;
+                    println!("new best: {pressure}");
+                }
+            }
+
+            let (total_pressure, steps) = self
+                .find_best_path_2_recurse(
+                    new_state,
+                    score_so_far + additional_release,
+                    best_score.clone(),
+                )
+                .unwrap_or_default();
+            Some((
+                total_pressure + additional_release,
+                Step::Move(*exit, actor_index),
+                steps,
+            ))
+        });
+
+        let (pressure, step, mut steps) =
+            steps.max_by_key(|(pressure, _step, _steps)| *pressure)?;
+
+        steps.insert(0, step);
+        Some((pressure, steps))
+    }
+
+    fn find_best_path_2(
+        &self,
+        position: Position,
+        number_of_actors: usize,
+        time: u32,
+    ) -> Option<(u32, Vec<Step>)> {
+        let best_score = Arc::new(Mutex::new(0));
+        let state = RecursionState {
+            time_remaining: time,
+            actors: vec![
+                Actor {
+                    position,
+                    time_remaining: 0,
+                };
+                number_of_actors
+            ],
+            closed_valves: HashSet::from_iter(self.nodes.keys().cloned()),
+        };
+        self.find_best_path_2_recurse(state, 0, best_score)
+    }
 }
 
 fn main() {
@@ -256,7 +373,15 @@ fn main() {
     let graph = Graph::parse(&input).unwrap();
     let graph = graph.optimize();
     println!("{graph:?}");
-    let (pressure, steps) = graph.find_best_path(Position::from_str("AA"), 30).unwrap();
+    // let (pressure, steps) = graph.find_best_path(Position::from_str("AA"), 30).unwrap();
+    //
+    // println!("{steps:?}");
+    // println!("{pressure:?}");
+
+    println!("Part 2");
+    let (pressure, steps) = graph
+        .find_best_path_2(Position::from_str("AA"), 2, 30)
+        .unwrap();
 
     println!("{steps:?}");
     println!("{pressure:?}");
@@ -268,7 +393,7 @@ mod test {
     use super::*;
 
     fn move_to(position: &str) -> Step {
-        Step::Move(Position::from_str(position))
+        Step::Move(Position::from_str(position), 0)
     }
 
     fn open() -> Step {
@@ -313,5 +438,43 @@ mod test {
                 .0,
             1651
         );
+    }
+
+    #[test]
+    fn example_2() {
+        let input = read_to_string("example").unwrap();
+        let graph = Graph::parse(&input).unwrap();
+        let graph = graph.optimize();
+
+        let (pressure, steps) = graph
+            .find_best_path_2(Position::from_str("AA"), 1, 30)
+            .unwrap();
+        println!("Steps: {steps:?}");
+        assert_eq!(pressure, 1651);
+
+        let (pressure, steps) = graph
+            .find_best_path_2(Position::from_str("AA"), 2, 26)
+            .unwrap();
+        println!("Steps: {steps:?}");
+        assert_eq!(pressure, 1707);
+    }
+
+    // #[test]
+    fn input() {
+        let input = read_to_string("input").unwrap();
+        let graph = Graph::parse(&input).unwrap();
+        let graph = graph.optimize();
+
+        let (pressure, steps) = graph
+            .find_best_path_2(Position::from_str("AA"), 1, 30)
+            .unwrap();
+        println!("Steps: {steps:?}");
+        assert_eq!(pressure, 1617);
+
+        let (pressure, steps) = graph
+            .find_best_path_2(Position::from_str("AA"), 2, 26)
+            .unwrap();
+        println!("Steps: {steps:?}");
+        assert_eq!(pressure, 2828);
     }
 }
